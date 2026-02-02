@@ -29,7 +29,7 @@ TRL is a cutting-edge library designed for post-training foundation models using
 
 ## Highlights
 
-- **Trainers**: Various fine-tuning methods are easily accessible via trainers like [`SFTTrainer`](https://huggingface.co/docs/trl/sft_trainer), [`GRPOTrainer`](https://huggingface.co/docs/trl/grpo_trainer), [`DPOTrainer`](https://huggingface.co/docs/trl/dpo_trainer), [`RewardTrainer`](https://huggingface.co/docs/trl/reward_trainer) and more.
+- **Trainers**: Various fine-tuning methods are easily accessible via trainers like [`SFTTrainer`](https://huggingface.co/docs/trl/sft_trainer), [`GRPOTrainer`](https://huggingface.co/docs/trl/grpo_trainer), [`DPOTrainer`](https://huggingface.co/docs/trl/dpo_trainer), [`SlimeTrainer`](#slimetrainer), [`RewardTrainer`](https://huggingface.co/docs/trl/reward_trainer) and more.
 
 - **Efficient and scalable**:
   - Leverages [🤗 Accelerate](https://github.com/huggingface/accelerate) to scale from single GPU to multi-node clusters using methods like [DDP](https://pytorch.org/tutorials/intermediate/ddp_tutorial.html) and [DeepSpeed](https://github.com/deepspeedai/DeepSpeed).
@@ -67,6 +67,40 @@ git clone https://github.com/huggingface/trl.git
 ## Quick Start
 
 For more flexibility and control over training, TRL provides dedicated trainer classes to post-train language models or PEFT adapters on a custom dataset. Each trainer in TRL is a light wrapper around the 🤗 Transformers trainer and natively supports distributed training methods like DDP, DeepSpeed ZeRO, and FSDP.
+
+### `SlimeTrainer`
+
+[`SlimeTrainer`](#) implements a specialized preference optimization method extending DPO. It utilizes a custom loss function that incorporates distance-based penalties and token-level rejection centering to refine model alignment.
+
+Here is an example of how to use the `SlimeTrainer` with its specific configuration options:
+
+```python
+from datasets import load_dataset
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from trl import SlimeConfig, SlimeTrainer
+
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+dataset = load_dataset("trl-lib/ultrafeedback_binarized", split="train")
+
+# Define Slime-specific hyperparameters
+training_args = SlimeConfig(
+    output_dir="Qwen2.5-0.5B-Slime",
+    hard_margin=1.5,           # Hard margin for the distance loss
+    soft_margin=1.0,           # Soft margin for the distance loss
+    dist_lambda=1.0,           # Weight for distance penalty
+    center_lambda_chosen=0.8,  # Regularization for chosen responses
+    center_lambda_rejected=0.0005, # Regularization for rejected responses
+)
+
+trainer = SlimeTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=dataset,
+    processing_class=tokenizer
+)
+trainer.train()
+```
 
 ### `SFTTrainer`
 
